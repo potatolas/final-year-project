@@ -1,3 +1,8 @@
+import numpy as np
+from sklearn.cluster import AffinityPropagation
+import matplotlib.pyplot as plt
+from itertools import cycle
+
 def search_call_sequence(target_method, call_sequences_processed):
     target_call_sequence = []
     for call_sequence in call_sequences_processed:
@@ -93,3 +98,94 @@ def generate_usage_pattern(target_method, target_sequence):
 
     
     return UsagePattern(target_method, pre_set, post_set, accompany_set_name)
+
+def method_to_string_list(list_of_method):
+    result = []
+    for method in list_of_method:
+        result.append(method.name)
+    return result
+
+def jaccard_similarity(list1, list2):
+
+    if(len(list1) == 0 and len(list2) == 0):
+        return 1 
+
+    intersection = len(list(set(list1).intersection(list2)))
+    union = (len(set(list1)) + len(set(list2))) - intersection
+    return float(intersection) / union
+
+def constructing_2d_matrix(size):
+    similarity_matrix = []
+    for row in range(0, size):
+        similarity_matrix.append([])
+        for col in range(0, size):
+            similarity_matrix[row].append(-1)
+
+    return similarity_matrix
+
+def get_matrix_value(usage_pattern_1, usage_pattern_2):
+    row_preset_names = method_to_string_list(usage_pattern_1.pre_set)
+    col_preset_names = method_to_string_list(usage_pattern_2.pre_set)
+
+    row_postset_names = method_to_string_list(usage_pattern_1.post_set)
+    col_postset_names = method_to_string_list(usage_pattern_2.post_set)
+
+    pre_value = jaccard_similarity(row_preset_names, col_preset_names)
+    post_value = jaccard_similarity(row_postset_names, col_postset_names)
+    accompany_value = jaccard_similarity(usage_pattern_1.accompany_set, usage_pattern_2.accompany_set)
+
+    matrix_value = (pre_value + post_value + accompany_value)/3
+    return matrix_value
+
+def generate_similarity_matrix(target_usage_pattern_list):
+    similarity_matrix = constructing_2d_matrix(len(target_usage_pattern_list))
+    for row in range(0, len(target_usage_pattern_list)):
+        for col in range(0, len(target_usage_pattern_list)):
+            if(row == col):
+                similarity_matrix[row][col] = 1
+            if(similarity_matrix[row][col] == -1):
+                matrix_value = get_matrix_value(target_usage_pattern_list[row], target_usage_pattern_list[col])
+                similarity_matrix[row][col] = matrix_value
+                similarity_matrix[col][row] = matrix_value
+    
+    return similarity_matrix
+
+def generate_clusters(similarity_matrix, plot_flag):
+
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning) 
+
+    X = np.array(similarity_matrix)
+    af = AffinityPropagation(affinity="precomputed", damping=0.5, convergence_iter=7, max_iter=400).fit(X)
+    cluster_centers_indices = af.cluster_centers_indices_
+    labels = af.labels_
+
+    n_clusters_ = len(cluster_centers_indices)
+
+    if(plot_flag):
+        plt.close("all")
+        plt.figure(1)
+        plt.clf()
+
+        colors = cycle("bgrcmykbgrcmykbgrcmykbgrcmyk")
+        for k, col in zip(range(n_clusters_), colors):
+            class_members = labels == k
+            cluster_center = X[cluster_centers_indices[k]]
+            plt.plot(X[class_members, 0], X[class_members, 1], col + ".")
+            plt.plot(
+                cluster_center[0],
+                cluster_center[1],
+                "o",
+                markerfacecolor=col,
+                markeredgecolor="k",
+                markersize=14,
+            )
+            for x in X[class_members]:
+                plt.plot([cluster_center[0], x[0]], [cluster_center[1], x[1]], col)
+
+        
+        plt.title("Estimated number of clusters: %d" % n_clusters_)
+        plt.show()
+
+    print("Labels:")
+    print(labels)
