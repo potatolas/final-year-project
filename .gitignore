@@ -5,3 +5,4 @@ code/test.ipynb
 code/test2.ipynb
 code/test3.ipynb
 code/test4.ipynb
+*.pyc
