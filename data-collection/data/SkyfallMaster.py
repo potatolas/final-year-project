@@ -160,4 +160,51 @@ class WebcamVideoStream:
         # indicate that the thread should be stopped
         self.stopped = True
 
+    # Worker threads that process video frame
+    def worker(input_q, output_q, cap_params, frame_processed):
+        print(">> loading frozen model for worker")
+        
+        detection_graph, sess, category_index = detector_utils.load_inference_graph(num_classes, frozen_graph_path, label_path)
+        sess = tf.Session(graph=detection_graph)
+        while True:
+            #print("> ===== in worker loop, frame ", frame_processed)
+            frame = input_q.get()
+            if (frame is not None):
+                # actual detection
+                boxes, scores, classes = detector_utils.detect_objects(
+                    frame, detection_graph, sess)
+                
+                tags = detector_utils.get_tags(classes, category_index, num_hands_detect, score_thresh, scores, boxes, frame)
+                
+                if (len(tags) > 0):
+                    id_utils.get_id(tags, seen_object_list)
+                    web_socket_client.send_message(tags,"hand")
+
+                id_utils.refresh_seen_object_list(seen_object_list, object_refresh_timeout)
+                detector_utils.draw_box_on_image_id(tags, frame) 
+                
+                output_q.put(frame)
+                frame_processed += 1
+            else:
+                output_q.put(frame)
+        sess.close()
+    
+    def load_labelmap(path):
+        """Loads label map proto.
+
+        Args:
+        path: path to StringIntLabelMap proto text file.
+        Returns:
+        a StringIntLabelMapProto
+        """
+        with tf.gfile.GFile(path, 'r') as fid:
+            label_map_string = fid.read()
+            label_map = string_int_label_map_pb2.StringIntLabelMap()
+            try:
+                text_format.Merge(label_map_string, label_map)
+            except text_format.ParseError:
+                label_map.ParseFromString(label_map_string)
+        _validate_label_map(label_map)
+        return label_map
+
 '''
