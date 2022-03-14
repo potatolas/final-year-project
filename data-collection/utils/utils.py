@@ -52,6 +52,7 @@ def sort_statements(statements):
     simple_statement_lines = [] #list containing nodes of type SimpleStatementLines
     function_def_lines = [] #list containing nodes of type FunctionDef
     class_def_lines = [] #list containing nodes of type ClassDef
+    for_lines = [] #list containing nodes of type For
 
     for statement in statements:
         if(isinstance(statement, cst.SimpleStatementLine)):
@@ -62,8 +63,10 @@ def sort_statements(statements):
             simple_statement_lines.append("Function Def")
         elif (isinstance(statement, cst.ClassDef)):
             class_def_lines.append(statement)
+        elif (isinstance(statement, cst.For)):
+            for_lines.append(statement)
     
-    return [simple_statement_lines, function_def_lines, class_def_lines]
+    return [simple_statement_lines, function_def_lines, class_def_lines, for_lines]
 
 def cluster(data, maxgap):
     data.sort()
